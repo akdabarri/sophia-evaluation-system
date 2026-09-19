@@ -92,10 +92,11 @@ export default function EvaluasiPage() {
   }
 
   return (
-    <div className="max-w-[900px] mx-auto w-full pb-24 font-sans">
+    // Penambahan px-6 py-8 untuk memberi ruang lega pada layar seluler
+    <div className="max-w-[900px] mx-auto w-full px-6 py-8 md:px-8 md:py-12 pb-24 font-sans">
       
-      {/* Header Halaman (Dibuat Statis agar Tidak Bertumpuk) */}
-      <div className="mb-10 pt-4 border-b border-slate-200/80 pb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+      {/* Header Halaman */}
+      <div className="mb-10 border-b border-slate-200/80 pb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div className="max-w-xl">
           <span className="text-[10px] font-bold tracking-widest uppercase text-blue-600 block mb-2">
             Modul Komputasi
@@ -108,8 +109,8 @@ export default function EvaluasiPage() {
           </p>
         </div>
         
-        {/* Indikator Token Elegan */}
-        <div className="flex flex-col items-end shrink-0">
+        {/* Indikator Token Elegan (Dibuat rata kiri di seluler, rata kanan di desktop) */}
+        <div className="flex flex-col items-start md:items-end shrink-0 w-full md:w-auto">
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1.5">Kapasitas Token</span>
           <div className="flex items-center gap-3 bg-white border border-slate-200 px-4 py-2 rounded-lg shadow-sm">
             <div className="flex gap-1.5">
@@ -136,8 +137,8 @@ export default function EvaluasiPage() {
         
         {/* Blok 1: Introduction */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden transition-all duration-300 focus-within:border-blue-500 focus-within:shadow-[0_0_0_4px_rgba(59,130,246,0.1)] shadow-sm">
-          <div className="px-6 py-4 flex items-center gap-3 bg-slate-50 border-b border-slate-100">
-            <span className="flex items-center justify-center w-6 h-6 rounded border border-slate-300 bg-white text-slate-600 font-bold text-xs shadow-sm">1</span>
+          <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 border-b border-slate-100">
+            <span className="flex items-center justify-center w-6 h-6 rounded border border-slate-300 bg-white text-slate-600 font-bold text-xs shadow-sm shrink-0">1</span>
             <div>
               <h2 className="text-sm font-bold text-slate-600 uppercase tracking-widest">Introduction & State of the Art</h2>
               <p className="text-[11px] font-medium text-slate-400 mt-0.5">Latar belakang, urgensi, dan rumusan masalah.</p>
@@ -148,15 +149,15 @@ export default function EvaluasiPage() {
             value={introText}
             onChange={(e) => setIntroText(e.target.value)}
             placeholder="Tuliskan latar belakang masalah, urgensi riset, dan research gap di sini..."
-            className="w-full bg-transparent border-0 px-6 py-5 text-[13px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-0 focus:border-transparent resize-y min-h-[200px] leading-relaxed font-medium"
+            className="w-full bg-transparent border-0 px-5 py-5 text-[13px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-0 focus:border-transparent resize-y min-h-[200px] leading-relaxed font-medium"
             style={{ boxShadow: 'none' }}
           />
         </div>
 
         {/* Blok 2: Methodology */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden transition-all duration-300 focus-within:border-blue-500 focus-within:shadow-[0_0_0_4px_rgba(59,130,246,0.1)] shadow-sm">
-          <div className="px-6 py-4 flex items-center gap-3 bg-slate-50 border-b border-slate-100">
-            <span className="flex items-center justify-center w-6 h-6 rounded border border-slate-300 bg-white text-slate-600 font-bold text-xs shadow-sm">2</span>
+          <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 border-b border-slate-100">
+            <span className="flex items-center justify-center w-6 h-6 rounded border border-slate-300 bg-white text-slate-600 font-bold text-xs shadow-sm shrink-0">2</span>
             <div>
               <h2 className="text-sm font-bold text-slate-600 uppercase tracking-widest">Methodology (PRISMA)</h2>
               <p className="text-[11px] font-medium text-slate-400 mt-0.5">Strategi pencarian, string Boolean, dan kriteria inklusi.</p>
@@ -167,15 +168,15 @@ export default function EvaluasiPage() {
             value={methodText}
             onChange={(e) => setMethodText(e.target.value)}
             placeholder="Uraikan strategi pencarian pangkalan data, string Boolean, dan kriteria eligibilitas..."
-            className="w-full bg-transparent border-0 px-6 py-5 text-[13px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-0 focus:border-transparent resize-y min-h-[200px] leading-relaxed font-medium"
+            className="w-full bg-transparent border-0 px-5 py-5 text-[13px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-0 focus:border-transparent resize-y min-h-[200px] leading-relaxed font-medium"
             style={{ boxShadow: 'none' }}
           />
         </div>
 
         {/* Blok 3: Results */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden transition-all duration-300 focus-within:border-blue-500 focus-within:shadow-[0_0_0_4px_rgba(59,130,246,0.1)] shadow-sm">
-          <div className="px-6 py-4 flex items-center gap-3 bg-slate-50 border-b border-slate-100">
-            <span className="flex items-center justify-center w-6 h-6 rounded border border-slate-300 bg-white text-slate-600 font-bold text-xs shadow-sm">3</span>
+          <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 border-b border-slate-100">
+            <span className="flex items-center justify-center w-6 h-6 rounded border border-slate-300 bg-white text-slate-600 font-bold text-xs shadow-sm shrink-0">3</span>
             <div>
               <h2 className="text-sm font-bold text-slate-600 uppercase tracking-widest">Results & Findings</h2>
               <p className="text-[11px] font-medium text-slate-400 mt-0.5">Ekstraksi data studi primer dan sintesis temuan utama.</p>
@@ -186,15 +187,15 @@ export default function EvaluasiPage() {
             value={resultText}
             onChange={(e) => setResultText(e.target.value)}
             placeholder="Sajikan ekstraksi data studi primer dan sintesis temuan utama..."
-            className="w-full bg-transparent border-0 px-6 py-5 text-[13px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-0 focus:border-transparent resize-y min-h-[250px] leading-relaxed font-medium"
+            className="w-full bg-transparent border-0 px-5 py-5 text-[13px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-0 focus:border-transparent resize-y min-h-[250px] leading-relaxed font-medium"
             style={{ boxShadow: 'none' }}
           />
         </div>
 
         {/* Blok 4: Discussion */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden transition-all duration-300 focus-within:border-blue-500 focus-within:shadow-[0_0_0_4px_rgba(59,130,246,0.1)] shadow-sm">
-          <div className="px-6 py-4 flex items-center gap-3 bg-slate-50 border-b border-slate-100">
-            <span className="flex items-center justify-center w-6 h-6 rounded border border-slate-300 bg-white text-slate-600 font-bold text-xs shadow-sm">4</span>
+          <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 border-b border-slate-100">
+            <span className="flex items-center justify-center w-6 h-6 rounded border border-slate-300 bg-white text-slate-600 font-bold text-xs shadow-sm shrink-0">4</span>
             <div>
               <h2 className="text-sm font-bold text-slate-600 uppercase tracking-widest">Discussion & Implication</h2>
               <p className="text-[11px] font-medium text-slate-400 mt-0.5">Komparasi temuan, implikasi teoritis, dan limitasi riset.</p>
@@ -205,17 +206,17 @@ export default function EvaluasiPage() {
             value={discussText}
             onChange={(e) => setDiscussText(e.target.value)}
             placeholder="Tuliskan komparasi temuan dengan literatur sebelumnya, implikasi teoritis, dan limitasi..."
-            className="w-full bg-transparent border-0 px-6 py-5 text-[13px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-0 focus:border-transparent resize-y min-h-[250px] leading-relaxed font-medium"
+            className="w-full bg-transparent border-0 px-5 py-5 text-[13px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-0 focus:border-transparent resize-y min-h-[250px] leading-relaxed font-medium"
             style={{ boxShadow: 'none' }}
           />
         </div>
 
         {/* Footer Action Form */}
         <div className="pt-8 pb-4 flex flex-col md:flex-row justify-between items-center gap-6 border-t border-slate-200/80">
-          <div className="flex items-start gap-3 max-w-lg">
+          <div className="flex items-start gap-3 w-full md:w-auto md:max-w-lg">
             <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">!</div>
             <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-              Memulai evaluasi akan mengonsumsi <strong className="text-slate-700">1 Token Kuota</strong>. Pastikan seluruh struktur IMRaD telah ditelaah mandiri. Proses komputasi memakan waktu 30-60 detik.
+              Memulai evaluasi akan mengonsumsi <strong className="text-slate-700">1 Token Kuota</strong>. Pastikan seluruh struktur IMRaD telah ditelaah mandiri. Proses komputasi memakan waktu 30 hingga 60 detik.
             </p>
           </div>
           

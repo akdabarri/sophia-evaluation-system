@@ -1,5 +1,4 @@
 import Sidebar from "@/components/layout/Sidebar";
-import TopBar from "@/components/layout/TopBar";
 
 export default function DashboardLayout({
   children,
@@ -7,14 +6,19 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="w-full h-screen flex bg-slate-50 overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 flex flex-col relative overflow-hidden">
-        <TopBar />
-        <main className="flex-1 overflow-y-auto p-6 lg:p-12 scroll-smooth" id="mainScrollArea">
-          {children}
-        </main>
+    // Struktur flex yang membelah secara vertikal di seluler dan horizontal di desktop
+    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden font-sans">
+      
+      {/* Kolom Bilah Samping / Header Seluler */}
+      <div className="flex-none z-30 shadow-sm md:shadow-none">
+        <Sidebar />
       </div>
+      
+      {/* Kolom Konten Utama (Scroll independen) */}
+      <main className="flex-1 w-full h-full overflow-y-auto relative scroll-smooth bg-[#fafbfc]">
+        {children}
+      </main>
+      
     </div>
   );
 }

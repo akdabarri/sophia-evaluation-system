@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image"; // Tambahkan impor Image
 import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
@@ -19,7 +20,6 @@ export default function LoginPage() {
     const cleanUsername = username.trim().toLowerCase();
     const cleanPassword = password.trim();
 
-    // Mengambil data langsung dari tabel 'groups' di Supabase
     const { data: user, error } = await supabase
       .from("groups")
       .select("username, password, role, group_name")
@@ -38,11 +38,9 @@ export default function LoginPage() {
       return;
     }
 
-    // Menyimpan sesi secara lokal
     document.cookie = `sophia_username=${user.username}; path=/; max-age=604800`;
     document.cookie = `sophia_role=${user.role}; path=/; max-age=604800`;
 
-    // Pengaturan rute berdasarkan Human-in-the-loop (HITL)
     if (user.role === "INSTRUCTOR") {
       router.push("/dosen/telemetri");
     } else {
@@ -51,29 +49,29 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafbfc] flex flex-col justify-between font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
+    <div className="h-screen overflow-y-auto bg-[#fafbfc] flex flex-col font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
       
-      {/* Header Bar Sangat Minimalis */}
-      <header className="w-full px-8 py-6 flex items-center justify-between bg-white border-b border-slate-200/60 z-10">
+      <header className="w-full px-8 py-6 flex-none flex items-center justify-between bg-white border-b border-slate-200/60 z-10 sticky top-0">
         <div className="flex items-center gap-3">
-          <div className="w-6 h-6 bg-blue-600 rounded-sm flex items-center justify-center text-white">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-          {/* Murni SOPHIA sesuai arahan */}
+          {/* Logo PNG diterapkan di sini menggantikan SVG lama */}
+          <Image 
+            src="/logo.png" 
+            alt="SOPHIA Logo" 
+            width={32} 
+            height={32} 
+            className="w-7 h-7 object-contain shrink-0 drop-shadow-sm" 
+          />
           <span className="font-bold text-sm tracking-[0.2em] text-slate-800">
             SOPHIA
           </span>
         </div>
-        <span className="text-xs text-slate-400 font-medium">
+        <span className="text-xs text-slate-400 font-medium hidden sm:block">
           Versi 3.0 / Purwarupa Tesis
         </span>
       </header>
 
-      {/* Kontainer Utama Form */}
-      <main className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-[480px]">
+      <main className="flex-1 flex flex-col px-6 py-10 my-auto">
+        <div className="w-full max-w-[480px] mx-auto">
           <div className="bg-white border border-slate-200 rounded-xl p-8 sm:p-12 shadow-sm">
             
             <div className="mb-10 text-center">
