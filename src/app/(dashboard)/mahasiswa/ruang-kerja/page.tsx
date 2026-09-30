@@ -48,7 +48,6 @@ export default function RuangKerjaPage() {
   const submissions = (data.submissions as any[]) ?? [];
 
   return (
-    // Penambahan px-4 py-6 pada mode mobile dan pembesaran pada desktop md:px-8 md:py-10
     <div className="max-w-6xl mx-auto w-full px-4 py-6 md:px-8 md:py-10 pb-16 font-sans">
       
       {/* Header Beranda Klasik Enterprise */}
@@ -61,7 +60,6 @@ export default function RuangKerjaPage() {
           }}
         />
         
-        {/* Penyesuaian gap dan alignment untuk mobile */}
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
           <div className="flex-1 w-full">
             <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight mb-2 md:mb-3">
@@ -116,7 +114,6 @@ export default function RuangKerjaPage() {
         </Link>
       </div>
 
-      {/* Penambahan overflow-x-auto untuk melindungi struktur tabel di mobile */}
       <div className="bg-white border border-slate-200 shadow-sm rounded-lg overflow-x-auto">
         <table className="w-full text-left text-sm whitespace-nowrap md:whitespace-normal">
           <thead className="bg-slate-50 border-b border-slate-200">
@@ -135,28 +132,49 @@ export default function RuangKerjaPage() {
                 </td>
               </tr>
             ) : (
-              submissions.sort((a: any,b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0,5).map((sub: any) => (
-                <tr key={sub.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 md:px-6 py-5 text-slate-600 font-medium text-xs">
-                    {new Date(sub.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </td>
-                  <td className="px-4 md:px-6 py-5">
-                    {sub.status === 'PUBLISHED' ? (
-                      <span className="inline-block px-2 md:px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[10px] font-bold uppercase tracking-wider">Selesai Divalidasi</span>
-                    ) : (
-                      <span className="inline-block px-2 md:px-3 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded text-[10px] font-bold uppercase tracking-wider animate-pulse">Menunggu Dosen</span>
-                    )}
-                  </td>
-                  <td className="px-4 md:px-6 py-5">
-                    <span className="font-bold text-slate-900 text-sm md:text-base">{sub.final_score || sub.ai_total_score || "-"}</span>
-                  </td>
-                  <td className="px-4 md:px-6 py-5 text-right">
-                    <Link href={`/mahasiswa/hasil?id=${sub.id}`} className="text-[10px] md:text-[11px] px-3 md:px-4 py-2 border border-slate-300 rounded font-bold text-slate-700 hover:bg-slate-900 hover:text-white transition-all uppercase tracking-wider inline-block">
-                      Buka Laporan
-                    </Link>
-                  </td>
-                </tr>
-              ))
+              submissions.sort((a: any,b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0,5).map((sub: any) => {
+                const isPublished = sub.status === 'PUBLISHED';
+                
+                return (
+                  <tr key={sub.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 md:px-6 py-5 text-slate-600 font-medium text-xs">
+                      {new Date(sub.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 md:px-6 py-5">
+                      {isPublished ? (
+                        <span className="inline-block px-2 md:px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[10px] font-bold uppercase tracking-wider">Selesai Divalidasi</span>
+                      ) : (
+                        <span className="inline-block px-2 md:px-3 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded text-[10px] font-bold uppercase tracking-wider animate-pulse">Menunggu Dosen</span>
+                      )}
+                    </td>
+                    
+                    {/* AREA SENSOR SKOR */}
+                    <td className="px-4 md:px-6 py-5">
+                      {isPublished ? (
+                        <span className="font-bold text-slate-900 text-sm md:text-base">{sub.final_score || "-"}</span>
+                      ) : (
+                        <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 border border-slate-200 rounded text-[11px] font-mono font-bold text-slate-400 cursor-help" title="Skor disembunyikan hingga dosen menyetujui evaluasi">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>
+                          Proses Validasi
+                        </div>
+                      )}
+                    </td>
+                    
+                    {/* AREA PENGUNCIAN TOMBOL */}
+                    <td className="px-4 md:px-6 py-5 text-right">
+                      {isPublished ? (
+                        <Link href={`/mahasiswa/hasil?id=${sub.id}`} className="text-[10px] md:text-[11px] px-3 md:px-4 py-2 border border-slate-300 rounded font-bold text-slate-700 hover:bg-slate-900 hover:text-white transition-all uppercase tracking-wider inline-block">
+                          Buka Laporan
+                        </Link>
+                      ) : (
+                        <button disabled className="text-[10px] md:text-[11px] px-3 md:px-4 py-2 border border-slate-200 bg-slate-100 rounded font-bold text-slate-400 cursor-not-allowed uppercase tracking-wider inline-block">
+                          Terkunci
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

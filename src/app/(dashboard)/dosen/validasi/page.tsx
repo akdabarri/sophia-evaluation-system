@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState, Suspense, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -12,13 +12,12 @@ function ValidasiContent() {
   const [saving, setSaving] = useState(false);
   const [submission, setSubmission] = useState<any>(null);
 
-  // State Editor Dosen
-  const [finalScore, setFinalScore] = useState<number>(0);
+  // State untuk Intervensi HITL (Menampung Data JSON AI yang bisa diedit)
+  const [modulesData, setModulesData] = useState<any[]>([]);
   const [feedbackNotes, setFeedbackNotes] = useState<string>("");
 
   useEffect(() => {
     async function loadSubmission() {
-      // PERBAIKAN: Matikan loading jika ID tidak ditemukan, jangan biarkan membeku
       if (!id) {
         setLoading(false);
         return;
@@ -32,25 +31,84 @@ function ValidasiContent() {
 
       if (!error && data) {
         setSubmission(data);
-        setFinalScore(data.ai_total_score || 0);
         setFeedbackNotes(data.final_feedback || "Berdasarkan telaah sistem AI dan kurasi dosen, draf Anda sudah cukup baik. Perhatikan catatan evaluasi untuk iterasi selanjutnya.");
+        
+        // Memuat data JSON AI ke dalam State yang bisa diedit dosen
+        if (data.ai_raw_feedback?.evaluations) {
+          setModulesData(data.ai_raw_feedback.evaluations);
+        }
       }
       
-      // Pastikan loading dimatikan apapun hasil dari database
       setLoading(false);
     }
     
     loadSubmission();
   }, [id]);
 
+  // 1. KALKULATOR SKOR TERTIMBANG (Otomatis Menghitung Bobot)
+  const calculatedFinalScore = useMemo(() => {
+    if (!modulesData || modulesData.length === 0) return 0;
+    
+    let total = 0;
+    modulesData.forEach((mod) => {
+      const name = (mod.chapterName || "").toLowerCase();
+      // PERBAIKAN FATAL: Paksa nilai menjadi angka murni agar tidak ter-concatenate
+      const score = parseInt(mod.score) || 0; 
+      
+      // Pembobotan Berdasarkan Urgensi Bab (Total 100%)
+      if (name.includes("intro")) total += score * 0.20; // 20%
+      else if (name.includes("method")) total += score * 0.20; // 20%
+      else if (name.includes("result")) total += score * 0.30; // 30%
+      else if (name.includes("discuss") || name.includes("conclu")) total += score * 0.30; // 30%
+      else total += score * 0.25; // Fallback jika nama bab tidak dikenali
+    });
+    
+    // Membulatkan hasil ke angka terdekat dan membatasi maksimal 100
+    const finalRounded = Math.round(total);
+    return finalRounded > 100 ? 100 : finalRounded;
+  }, [modulesData]);
+
+  // 2. PELACAK INTERVENSI & VALIDASI INPUT (Mendeteksi Editan Dosen)
+  const handleModuleEdit = (index: number, field: string, subfield: string | null, value: any) => {
+    const newData = [...modulesData];
+    
+    // --- TAMBAHAN BARU: Validasi khusus untuk input skor (Maks 100, Min 0) ---
+    let validatedValue = value;
+    if (field === "score") {
+      validatedValue = parseInt(value) || 0; // Pastikan berupa angka
+      if (validatedValue > 100) validatedValue = 100; // Hard limit atas
+      if (validatedValue < 0) validatedValue = 0;     // Hard limit bawah
+    }
+    // ----------------------------------------------------------------------
+
+    if (subfield) {
+      newData[index][field][subfield] = validatedValue;
+    } else {
+      newData[index][field] = validatedValue;
+    }
+    
+    // Menambahkan penanda tak kasatmata bahwa bab ini telah dikalibrasi manusia
+    newData[index].isEditedByHuman = true; 
+    setModulesData(newData);
+  };
+
   const handlePublish = async () => {
     setSaving(true);
+    
+    // Membungkus kembali JSON dengan data yang sudah diedit & ditandai
+    const calibratedRawFeedback = {
+      ...submission.ai_raw_feedback,
+      evaluations: modulesData,
+      totalScore: calculatedFinalScore 
+    };
+
     const { error } = await supabase
       .from("submissions")
       .update({
         status: "PUBLISHED",
-        final_score: finalScore,
+        final_score: calculatedFinalScore, // Skor yang tersimpan adalah skor tertimbang otomatis
         final_feedback: feedbackNotes,
+        ai_raw_feedback: calibratedRawFeedback // Menimpa JSON AI lama dengan JSON yang telah dikalibrasi
       })
       .eq("id", id);
 
@@ -62,7 +120,6 @@ function ValidasiContent() {
     }
   };
 
-  // 1. Tampilan saat data sedang ditarik
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -73,7 +130,6 @@ function ValidasiContent() {
     );
   }
 
-  // 2. Tampilan jika ID naskah tidak valid atau diakses tanpa URL yang benar
   if (!submission) {
     return (
       <div className="max-w-2xl mx-auto mt-20 p-10 bg-white border border-slate-200 rounded-xl shadow-sm text-center">
@@ -91,13 +147,11 @@ function ValidasiContent() {
     );
   }
 
-  const aiRawArray = submission.ai_raw_feedback?.evaluations || [];
-
   return (
     <div className="max-w-[1400px] mx-auto w-full pb-24 px-4 sm:px-6 lg:px-8 font-sans">
       
       {/* Header Halaman */}
-      <div className="mb-8 pt-6 border-b border-slate-200/80 pb-6 flex justify-between items-end">
+      <div className="mb-8 pt-6 border-b border-slate-200/80 pb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <span className="text-[10px] font-bold tracking-widest uppercase text-amber-600 block mb-2">
             Human-in-the-Loop Action
@@ -109,11 +163,11 @@ function ValidasiContent() {
             Penulis: <strong className="text-slate-700">{submission.groups?.group_name}</strong> | Iterasi Ke-{submission.iteration_number}
           </p>
         </div>
-        <div className="flex gap-3">
-          <button onClick={() => router.push('/dosen/telemetri')} className="px-4 py-2 bg-white border border-slate-300 text-slate-600 rounded text-xs font-bold uppercase tracking-wider hover:bg-slate-50">
+        <div className="flex gap-3 w-full md:w-auto">
+          <button onClick={() => router.push('/dosen/telemetri')} className="px-4 py-2 flex-1 md:flex-none bg-white border border-slate-300 text-slate-600 rounded text-xs font-bold uppercase tracking-wider hover:bg-slate-50">
             Batal
           </button>
-          <button onClick={handlePublish} disabled={saving} className="px-6 py-2 bg-[#10b981] text-white rounded text-xs font-bold uppercase tracking-wider hover:bg-emerald-500 transition-colors shadow-sm disabled:bg-slate-300 flex items-center gap-2">
+          <button onClick={handlePublish} disabled={saving} className="px-6 py-2 flex-1 md:flex-none bg-[#10b981] text-white rounded text-xs font-bold uppercase tracking-wider hover:bg-emerald-500 transition-colors shadow-sm disabled:bg-slate-300 flex items-center justify-center gap-2">
             {saving ? "Merekam ke Pangkalan Data..." : "Setujui & Terbitkan (Publish)"}
           </button>
         </div>
@@ -147,68 +201,83 @@ function ValidasiContent() {
           </div>
         </div>
 
-        {/* PANEL KANAN: Evaluasi AI & Editor Dosen */}
+        {/* PANEL KANAN: Editor Intervensi Dosen */}
         <div className="bg-[#0a0f1c] border border-slate-800 shadow-xl rounded-xl overflow-hidden flex flex-col h-[700px]">
           <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-[#070b14]">
             <div>
-              <h3 className="font-bold text-white text-sm">Panel Kurasi AI</h3>
-              <p className="text-[10px] font-mono text-amber-500 uppercase tracking-widest mt-1">Dosen memiliki otoritas override</p>
+              <h3 className="font-bold text-white text-sm">Panel Kurasi & Kalibrasi</h3>
+              <p className="text-[10px] font-mono text-amber-500 uppercase tracking-widest mt-1">Edit langsung pada kotak umpan balik</p>
             </div>
             
-            {/* Skor AI Override */}
-            <div className="flex items-center gap-3 bg-white/10 p-2 rounded border border-white/10">
-              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Skor Akhir:</span>
-              <input 
-                type="number" 
-                value={finalScore} 
-                onChange={(e) => setFinalScore(Number(e.target.value))}
-                className="w-16 bg-black/50 text-emerald-400 font-mono font-bold text-center border border-slate-700 rounded px-2 py-1 focus:outline-none focus:border-amber-500"
-              />
+            {/* Indikator Skor Tertimbang Otomatis */}
+            <div className="flex items-center gap-3 bg-white/5 p-2 rounded border border-white/10">
+              <div className="text-right">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Skor Tertimbang</span>
+                <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest block">Otomatis Terkalkulasi</span>
+              </div>
+              <div className="w-14 bg-emerald-500/20 text-emerald-400 font-black text-lg text-center border border-emerald-500/30 rounded py-1">
+                {calculatedFinalScore}
+              </div>
             </div>
           </div>
           
           <div className="p-6 overflow-y-auto flex-1 space-y-6">
             
             <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-lg">
-              <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-2">Catatan Final Dosen (Feed-forward)</label>
+              <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-2">Catatan Final Dosen (General Feed-forward)</label>
               <textarea 
                 value={feedbackNotes}
                 onChange={(e) => setFeedbackNotes(e.target.value)}
-                className="w-full bg-black/40 border border-slate-700 rounded text-slate-300 text-[13px] p-3 focus:outline-none focus:border-amber-500 min-h-[100px]"
-                placeholder="Tuliskan catatan tambahan atau koreksi terhadap halusinasi AI di sini..."
+                className="w-full bg-black/40 border border-slate-700 rounded text-slate-300 text-[13px] p-3 focus:outline-none focus:border-amber-500 min-h-[80px]"
+                placeholder="Tuliskan pesan penutup untuk kelompok ini..."
               />
             </div>
 
-            {/* Render Hasil JSON AI */}
-            {aiRawArray.length === 0 ? (
+            {modulesData.length === 0 ? (
               <div className="p-4 border border-dashed border-slate-700 text-slate-500 text-xs text-center rounded">
-                Tidak ada data struktur modul AI yang ditemukan pada naskah ini.
+                Memuat struktur modul AI...
               </div>
             ) : (
-              aiRawArray.map((module: any, index: number) => {
+              modulesData.map((module: any, index: number) => {
                 return (
-                  <div key={index} className="bg-white/5 border border-white/10 p-5 rounded-lg space-y-4">
+                  <div key={index} className={`border p-5 rounded-lg space-y-4 transition-colors ${module.isEditedByHuman ? 'bg-blue-900/10 border-blue-500/30' : 'bg-white/5 border-white/10'}`}>
                     <div className="flex justify-between items-center border-b border-white/10 pb-3">
-                      <h4 className="text-xs font-bold text-slate-300 uppercase tracking-widest">{module.chapterName}</h4>
-                      <span className="text-xs font-mono font-bold text-blue-400 bg-blue-400/10 px-2 py-1 rounded">Skor Mesin: {module.score || 0}</span>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-widest">{module.chapterName}</h4>
+                        {module.isEditedByHuman && (
+                          <span className="bg-blue-500/20 text-blue-400 text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border border-blue-500/30">
+                            Disunting Dosen
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Skor Bab:</span>
+                        <input 
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={module.score}
+                          onChange={(e) => handleModuleEdit(index, "score", null, e.target.value)}
+                          className="w-14 bg-black/50 text-white font-mono font-bold text-center border border-slate-600 rounded px-1 py-1 text-sm focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
                     </div>
                     
-                    <div className="space-y-2 mb-4 p-3 bg-black/40 rounded border border-white/5">
-                        <p className="text-[11px] text-emerald-400/80 font-medium"><span className="font-bold text-emerald-400">Kekuatan:</span> {module.strengths}</p>
-                        <p className="text-[11px] text-red-400/80 font-medium"><span className="font-bold text-red-400">Kelemahan:</span> {module.improvements}</p>
-                    </div>
-
                     <div>
-                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block mb-1">Feed-Up (Tujuan)</span>
-                      <p className="text-[12px] text-slate-400 leading-relaxed font-medium">{module.pedagogicalAlignment?.feedUp || "-"}</p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block mb-1">Feed-Back (Evaluasi)</span>
-                      <p className="text-[12px] text-slate-400 leading-relaxed font-medium">{module.pedagogicalAlignment?.feedBack || "-"}</p>
+                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block mb-1">Feed-Back (Kritik / Evaluasi)</span>
+                      <textarea 
+                        value={module.pedagogicalAlignment?.feedBack || ""}
+                        onChange={(e) => handleModuleEdit(index, "pedagogicalAlignment", "feedBack", e.target.value)}
+                        className="w-full bg-black/30 border border-slate-700/50 rounded text-slate-300 text-[12px] p-2 focus:outline-none focus:border-blue-500 min-h-[80px]"
+                      />
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-1">Feed-Forward (Perbaikan)</span>
-                      <p className="text-[12px] text-slate-400 leading-relaxed font-medium whitespace-pre-wrap">{module.pedagogicalAlignment?.feedForward || "-"}</p>
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block mb-1">Feed-Forward (Instruksi Perbaikan)</span>
+                      <textarea 
+                        value={module.pedagogicalAlignment?.feedForward || ""}
+                        onChange={(e) => handleModuleEdit(index, "pedagogicalAlignment", "feedForward", e.target.value)}
+                        className="w-full bg-black/30 border border-slate-700/50 rounded text-slate-300 text-[12px] p-2 focus:outline-none focus:border-blue-500 min-h-[80px]"
+                      />
                     </div>
                   </div>
                 );

@@ -10,7 +10,6 @@ export default function RiwayatPage() {
 
   useEffect(() => {
     async function fetchHistory() {
-      // 1. Dapatkan identitas kelompok dari sesi peramban
       const cookies = document.cookie.split("; ");
       const userCookie = cookies.find((row) => row.startsWith("sophia_username="));
       const activeUsername = userCookie ? userCookie.split("=")[1] : null;
@@ -20,7 +19,6 @@ export default function RiwayatPage() {
         return;
       }
 
-      // 2. Tarik ID kelompok terlebih dahulu
       const { data: group } = await supabase
         .from("groups")
         .select("id")
@@ -28,7 +26,6 @@ export default function RiwayatPage() {
         .single();
 
       if (group) {
-        // 3. Tarik seluruh riwayat naskah kelompok tersebut
         const { data: subs } = await supabase
           .from("submissions")
           .select("*")
@@ -38,8 +35,9 @@ export default function RiwayatPage() {
         if (subs && subs.length > 0) {
           setSubmissions(subs);
           
-          // Kalkulasi Metrik KPI
-          const scores = subs.map(s => s.final_score || s.ai_total_score).filter(Boolean);
+          // Kalkulasi Metrik KPI (Hanya mengambil skor yang sudah PUBLISHED)
+          const publishedSubs = subs.filter(s => s.status === "PUBLISHED");
+          const scores = publishedSubs.map(s => s.final_score).filter(Boolean);
           const highest = scores.length > 0 ? Math.max(...scores) : 0;
           
           setKpi({
@@ -68,7 +66,6 @@ export default function RiwayatPage() {
   return (
     <div className="max-w-[1100px] mx-auto w-full pb-24 px-4 sm:px-6 lg:px-8 font-sans">
       
-      {/* Header Eksklusif */}
       <div className="mb-8 pt-8 border-b border-slate-200/80 pb-6">
         <span className="text-[10px] font-bold tracking-widest uppercase text-blue-600 block mb-2">
           Jejak Audit Sistem
@@ -77,11 +74,10 @@ export default function RiwayatPage() {
           Log Riwayat Evaluasi
         </h1>
         <p className="text-slate-500 text-[13px] font-medium leading-relaxed max-w-2xl">
-          Rekam jejak seluruh iterasi naskah IMRaD yang telah diproses oleh arsitektur Generative AI. Laporan yang masih menunggu otorisasi Dosen Pengampu tidak dapat diakses untuk menjaga integritas data.
+          Rekam jejak seluruh iterasi naskah IMRaD yang telah diproses oleh arsitektur Generative AI. Laporan yang masih menunggu otorisasi Dosen Pengampu akan <strong>disensor (blind evaluation)</strong> untuk menjaga objektivitas penilaian.
         </p>
       </div>
 
-      {/* Baris KPI (Key Performance Indicators) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm flex flex-col justify-between">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Total Iterasi Komputasi</span>
@@ -106,7 +102,6 @@ export default function RiwayatPage() {
         </div>
       </div>
 
-      {/* Tabel Data Grid Presisi */}
       <div className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
         <div className="px-6 py-5 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
           <h3 className="font-bold text-slate-900 text-sm tracking-tight">Katalog Resolusi Naskah</h3>
@@ -135,7 +130,6 @@ export default function RiwayatPage() {
               ) : (
                 submissions.map((sub, idx) => {
                   const isPublished = sub.status === "PUBLISHED";
-                  // Menghitung iterasi mundur karena data diurutkan dari terbaru
                   const iterNumber = submissions.length - idx; 
                   
                   return (
@@ -160,30 +154,28 @@ export default function RiwayatPage() {
                         {isPublished ? (
                           <div className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-widest">Selesai Ditelaah</span>
+                            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-widest">Tervalidasi</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                            <span className="text-[11px] font-bold text-amber-700 uppercase tracking-widest">Dalam Antrean Dosen</span>
+                            <span className="text-[11px] font-bold text-amber-700 uppercase tracking-widest">Sedang Ditinjau Dosen</span>
                           </div>
                         )}
                       </td>
 
-                      <td className="px-6 py-5">
-                        <div className="flex items-center justify-center gap-3">
-                          <div className="text-center">
-                            <span className="block font-mono text-[13px] font-bold text-slate-400">{sub.ai_total_score || "-"}</span>
-                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Skor AI</span>
-                          </div>
-                          <div className="w-px h-6 bg-slate-200"></div>
-                          <div className="text-center">
-                            <span className={`block font-mono text-[13px] font-bold ${isPublished ? 'text-emerald-600' : 'text-slate-400'}`}>
-                              {sub.final_score || "-"}
-                            </span>
-                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Skor Akhir</span>
-                          </div>
-                        </div>
+                      {/* AREA SENSOR SKOR */}
+                      <td className="px-6 py-5 text-center">
+                        {isPublished ? (
+                           <div className="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[13px] font-mono font-bold">
+                             Skor Final: {sub.final_score}
+                           </div>
+                        ) : (
+                           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-200 rounded text-[13px] font-mono font-bold text-slate-400 cursor-help" title="Skor disembunyikan hingga dosen menyetujui evaluasi">
+                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>
+                             Disensor
+                           </div>
+                        )}
                       </td>
 
                       <td className="px-6 py-5 text-right">

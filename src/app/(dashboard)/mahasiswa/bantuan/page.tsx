@@ -8,6 +8,7 @@ interface Ticket {
   message: string;
   status: string;
   created_at: string;
+  reply_message?: string; // TAMBAHAN: Properti untuk menampung balasan dosen
 }
 
 export default function BantuanPage() {
@@ -236,9 +237,23 @@ export default function BantuanPage() {
                               {ticket.status}
                             </span>
                           </div>
-                          <p className="text-[12px] text-slate-700 leading-relaxed font-medium line-clamp-3 mb-3">
+                          
+                          <p className="text-[12px] text-slate-700 leading-relaxed font-medium mb-3">
                             "{ticket.message}"
                           </p>
+
+                          {/* TAMPILAN BALASAN INSTRUKTUR */}
+                          {!isOpen && ticket.reply_message && (
+                            <div className="mt-3 mb-3 bg-blue-50/50 border border-blue-100 p-3 rounded-lg relative">
+                              <span className="absolute -top-2 left-3 bg-blue-100 text-blue-700 text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border border-blue-200">
+                                Tanggapan Instruktur
+                              </span>
+                              <p className="text-[11px] text-blue-900 leading-relaxed font-medium mt-1 whitespace-pre-wrap">
+                                {ticket.reply_message}
+                              </p>
+                            </div>
+                          )}
+
                           <p className="text-[10px] text-slate-400 font-mono">
                             {new Date(ticket.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB
                           </p>

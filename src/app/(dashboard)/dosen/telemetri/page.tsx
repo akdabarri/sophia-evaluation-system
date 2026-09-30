@@ -9,17 +9,25 @@ import {
 export default function TelemetriPage() {
   const [loading, setLoading] = useState(true);
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [tickets, setTickets] = useState<any[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [kpi, setKpi] = useState({
     pending: 0,
     published: 0,
     avgScore: 0,
-    completionRate: 0
+    completionRate: 0,
+    openTickets: 0
   });
+
+  // State untuk membalas tiket
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
 
   const fetchTelemetry = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // 1. Tarik Data Submissions (Evaluasi)
+    const { data: subData, error: subError } = await supabase
       .from("submissions")
       .select(`
         *,
@@ -27,23 +35,37 @@ export default function TelemetriPage() {
       `)
       .order("created_at", { ascending: false });
 
-    if (!error && data) {
-      setSubmissions(data);
+    // 2. Tarik Data Tiket Bantuan
+    const { data: ticketData, error: ticketError } = await supabase
+      .from("support_tickets")
+      .select(`
+        *,
+        groups ( group_name )
+      `)
+      .order("created_at", { ascending: false });
 
-      // Kalkulasi KPI
-      const pendingCount = data.filter(s => s.status === "PENDING_REVIEW").length;
-      const publishedCount = data.filter(s => s.status === "PUBLISHED").length;
-      const totalScore = data.reduce((acc, curr) => acc + (curr.ai_total_score || 0), 0);
-      const avg = data.length > 0 ? Math.round(totalScore / data.length) : 0;
-      const rate = data.length > 0 ? Math.round((publishedCount / data.length) * 100) : 0;
+    if (!subError && subData) {
+      setSubmissions(subData);
 
-      setKpi({ pending: pendingCount, published: publishedCount, avgScore: avg, completionRate: rate });
+      // Kalkulasi KPI Naskah
+      const pendingCount = subData.filter(s => s.status === "PENDING_REVIEW").length;
+      const publishedCount = subData.filter(s => s.status === "PUBLISHED").length;
+      const totalScore = subData.reduce((acc, curr) => acc + (curr.ai_total_score || 0), 0);
+      const avg = subData.length > 0 ? Math.round(totalScore / subData.length) : 0;
+      const rate = subData.length > 0 ? Math.round((publishedCount / subData.length) * 100) : 0;
+
+      // Kalkulasi KPI Tiket
+      let openTicketsCount = 0;
+      if (!ticketError && ticketData) {
+         setTickets(ticketData);
+         openTicketsCount = ticketData.filter(t => t.status === "OPEN").length;
+      }
+
+      setKpi({ pending: pendingCount, published: publishedCount, avgScore: avg, completionRate: rate, openTickets: openTicketsCount });
 
       // Agregasi Data untuk Grafik (Volume Inferensi Harian)
       const dailyData: Record<string, { count: number, totalScore: number }> = {};
-      
-      // Balik urutan untuk grafik (dari terlama ke terbaru)
-      const reversedData = [...data].reverse();
+      const reversedData = [...subData].reverse();
       
       reversedData.forEach(sub => {
         const dateStr = new Date(sub.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
@@ -69,7 +91,25 @@ export default function TelemetriPage() {
     fetchTelemetry();
   }, []);
 
-  // Tooltip Grafik Khusus
+  // Fungsi untuk Menutup dan Membalas Tiket
+  const handleResolveTicket = async (ticketId: string) => {
+    const { error } = await supabase
+      .from("support_tickets")
+      .update({ 
+        status: "RESOLVED",
+        reply_message: replyText || "Tiket telah diselesaikan oleh Instruktur tanpa pesan tambahan."
+      })
+      .eq("id", ticketId);
+
+    if (!error) {
+      setReplyingTo(null);
+      setReplyText("");
+      fetchTelemetry(); 
+    } else {
+      alert("Gagal memperbarui status tiket.");
+    }
+  };
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -86,7 +126,6 @@ export default function TelemetriPage() {
   return (
     <div className="max-w-[1200px] mx-auto w-full pb-20 px-4 sm:px-6 lg:px-8 font-sans">
       
-      {/* Header Eksklusif */}
       <div className="mb-8 pt-8 border-b border-slate-200/80 pb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div className="max-w-2xl">
           <span className="text-[10px] font-bold tracking-widest uppercase text-blue-600 block mb-2">
@@ -96,7 +135,7 @@ export default function TelemetriPage() {
             Telemetri & Tata Kelola HITL
           </h1>
           <p className="text-slate-500 text-[13px] font-medium leading-relaxed">
-            Dasbor pengawasan mesin AI. Lakukan intervensi <strong>Human-in-the-Loop</strong> untuk memitigasi halusinasi model bahasa sebelum laporan formatif diekspos kepada mahasiswa.
+            Dasbor pengawasan mesin AI dan resolusi keluhan mahasiswa. Lakukan intervensi <strong>Human-in-the-Loop</strong> untuk memitigasi halusinasi model bahasa.
           </p>
         </div>
         <button onClick={fetchTelemetry} className="bg-white border border-slate-300 text-slate-700 px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 hover:text-blue-600 transition-colors rounded shadow-sm flex items-center gap-2 shrink-0">
@@ -114,35 +153,26 @@ export default function TelemetriPage() {
       ) : (
         <>
           {/* Baris KPI (Key Performance Indicators) */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
             <div className="bg-[#0a0f1c] border border-slate-800 p-6 rounded-xl shadow-xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl transform translate-x-8 -translate-y-8" />
               <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block mb-2 relative z-10">Antrean Intervensi</span>
               <div className="flex items-baseline gap-2 relative z-10">
                 <span className="text-5xl font-black text-white tracking-tighter">{kpi.pending}</span>
-                <span className="text-xs font-mono text-slate-400 uppercase tracking-widest">Draf</span>
               </div>
-              {kpi.pending > 0 && (
-                <div className="absolute top-6 right-6 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                </div>
-              )}
             </div>
             
             <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm flex flex-col justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Total Divalidasi</span>
               <div className="flex items-baseline gap-2 mt-2">
                 <span className="text-4xl font-black text-emerald-600 tracking-tighter">{kpi.published}</span>
-                <span className="text-xs font-mono text-slate-500 uppercase tracking-widest">Laporan</span>
               </div>
             </div>
 
             <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm flex flex-col justify-between">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Rerata Skor Kelas</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Rerata Skor</span>
               <div className="flex items-baseline gap-2 mt-2">
                 <span className="text-4xl font-black text-slate-800 tracking-tighter">{kpi.avgScore}</span>
-                <span className="text-xs font-mono text-slate-500 uppercase tracking-widest">/ 100</span>
               </div>
             </div>
 
@@ -150,45 +180,113 @@ export default function TelemetriPage() {
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Rasio Penyelesaian</span>
               <div className="flex items-baseline gap-2 mt-2">
                 <span className="text-4xl font-black text-blue-600 tracking-tighter">{kpi.completionRate}</span>
-                <span className="text-xs font-mono text-slate-500 uppercase tracking-widest">%</span>
+              </div>
+            </div>
+
+            {/* KPI BARU: Tiket Bantuan */}
+            <div className={`border p-6 rounded-xl shadow-sm flex flex-col justify-between ${kpi.openTickets > 0 ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+              <span className={`text-[10px] font-bold uppercase tracking-widest block mb-2 ${kpi.openTickets > 0 ? 'text-red-500' : 'text-slate-400'}`}>Tiket Bantuan (Aktif)</span>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className={`text-4xl font-black tracking-tighter ${kpi.openTickets > 0 ? 'text-red-600' : 'text-slate-400'}`}>{kpi.openTickets}</span>
               </div>
             </div>
           </div>
 
-          {/* Grafik Volume Aktivitas (Recharts) */}
-          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mb-8">
-            <div className="mb-6">
-              <h3 className="text-slate-900 font-bold text-sm tracking-tight mb-1">Aktivitas Komputasi Sistem</h3>
-              <p className="text-slate-500 text-[10px] font-mono uppercase tracking-widest">Tren volume pengumpulan draf berdasarkan garis waktu</p>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            {/* Grafik Volume Aktivitas (Lebar 2/3) */}
+            <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+              <div className="mb-6">
+                <h3 className="text-slate-900 font-bold text-sm tracking-tight mb-1">Aktivitas Komputasi Sistem</h3>
+                <p className="text-slate-500 text-[10px] font-mono uppercase tracking-widest">Tren volume pengumpulan draf</p>
+              </div>
+              <div className="h-[220px] w-full">
+                {chartData.length === 0 ? (
+                  <div className="h-full flex items-center justify-center border border-dashed border-slate-200 rounded text-slate-400 text-xs font-medium">
+                    Belum ada data.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid stroke="#f1f5f9" strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="left" tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fill: '#94a3b8', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                      <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3', stroke: '#cbd5e1' }} />
+                      <Area yAxisId="left" type="monotone" dataKey="volume" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorVolume)" />
+                      <Area yAxisId="right" type="step" dataKey="avgDaily" stroke="#10b981" strokeWidth={2} strokeDasharray="4 4" fill="none" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
             </div>
-            <div className="h-[260px] w-full">
-              {chartData.length === 0 ? (
-                <div className="h-full flex items-center justify-center border border-dashed border-slate-200 rounded text-slate-400 text-xs font-medium">
-                  Belum ada data aktivitas komputasi yang direkam.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke="#f1f5f9" strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-                    <YAxis yAxisId="left" tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fill: '#94a3b8', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                    <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3', stroke: '#cbd5e1' }} />
-                    <Area yAxisId="left" type="monotone" dataKey="volume" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorVolume)" />
-                    <Area yAxisId="right" type="step" dataKey="avgDaily" stroke="#10b981" strokeWidth={2} strokeDasharray="4 4" fill="none" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
+
+            {/* TABEL BARU: Resolusi Tiket Bantuan (Lebar 1/3) */}
+            <div className="lg:col-span-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+              <div className="px-5 py-4 border-b border-slate-200 bg-slate-50">
+                <h3 className="font-bold text-slate-900 text-sm tracking-tight mb-1 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Antrean Bantuan (Tiket)
+                </h3>
+              </div>
+              <div className="p-4 overflow-y-auto flex-1 max-h-[350px] space-y-3 bg-slate-50/50">
+                {tickets.length === 0 ? (
+                  <p className="text-center text-xs text-slate-400 font-medium py-10">Tidak ada tiket bantuan masuk.</p>
+                ) : (
+                  tickets.map(ticket => {
+                    const isOpen = ticket.status === "OPEN";
+                    const isReplying = replyingTo === ticket.id;
+
+                    return (
+                      <div key={ticket.id} className={`p-4 rounded-lg border transition-all ${isOpen ? 'bg-white border-amber-200 shadow-sm' : 'bg-slate-100 border-slate-200 opacity-60'}`}>
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="font-bold text-slate-800 text-xs">{ticket.groups?.group_name}</span>
+                          {isOpen && !isReplying && (
+                            <button onClick={() => setReplyingTo(ticket.id)} className="text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-2 py-1 rounded hover:bg-amber-200 transition-colors">
+                              Balas Keluhan
+                            </button>
+                          )}
+                        </div>
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block mb-1">{ticket.category}</span>
+                        <p className="text-[11px] text-slate-600 font-medium leading-relaxed mb-2 line-clamp-4">"{ticket.message}"</p>
+                        
+                        {/* KOTAK INPUT BALASAN DOSEN */}
+                        {isReplying && (
+                          <div className="mt-3 pt-3 border-t border-slate-100">
+                            <textarea 
+                              value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              placeholder="Ketik jawaban untuk kelompok ini..."
+                              className="w-full bg-slate-50 border border-slate-200 rounded text-slate-900 text-[11px] p-2 focus:outline-none focus:border-blue-500 min-h-[60px] mb-2 placeholder:text-slate-400"
+                            />
+                            <div className="flex justify-end gap-2">
+                              <button onClick={() => {setReplyingTo(null); setReplyText("");}} className="text-[9px] font-bold uppercase px-2 py-1 text-slate-500 hover:bg-slate-100 rounded">Batal</button>
+                              <button onClick={() => handleResolveTicket(ticket.id)} className="text-[9px] font-bold uppercase bg-emerald-500 text-white px-3 py-1 rounded hover:bg-emerald-600 shadow-sm">
+                                Kirim & Selesai
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {!isReplying && (
+                          <span className="text-[9px] font-mono text-slate-400">
+                            {new Date(ticket.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Tabel Orkestrasi Dosen (Data Grid) */}
+          {/* Tabel Orkestrasi Dosen (Data Grid Utama) */}
           <div className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
             <div className="px-6 py-5 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
               <div>

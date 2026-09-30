@@ -13,7 +13,6 @@ function HasilContent() {
 
   useEffect(() => {
     async function fetchReport() {
-      // PERBAIKAN: Jika ID tidak ada di URL, matikan loading dan hentikan eksekusi
       if (!id) {
         setLoading(false);
         return;
@@ -29,14 +28,12 @@ function HasilContent() {
         setSubmission(data);
       }
       
-      // Pastikan loading dimatikan apapun hasil kuerinya
       setLoading(false);
     }
     
     fetchReport();
   }, [id]);
 
-  // 1. Tampilan saat memuat data
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -47,7 +44,6 @@ function HasilContent() {
     );
   }
 
-  // 2. Tampilan jika ID tidak valid, atau naskah tidak ditemukan
   if (!submission) {
     return (
       <div className="max-w-2xl mx-auto mt-20 p-10 bg-white border border-slate-200 rounded-xl shadow-sm text-center">
@@ -65,7 +61,6 @@ function HasilContent() {
     );
   }
 
-  // 3. Tampilan jika naskah ditemukan, tapi statusnya belum disetujui dosen
   if (submission.status !== "PUBLISHED") {
     return (
       <div className="max-w-2xl mx-auto mt-20 p-10 bg-white border border-slate-200 rounded-xl shadow-sm text-center">
@@ -86,12 +81,12 @@ function HasilContent() {
   const aiRawArray = submission.ai_raw_feedback?.evaluations || [];
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 font-sans">
+    <div className="max-w-5xl mx-auto pb-20 font-sans px-4 sm:px-6">
       
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 pt-4">
         <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Laporan Evaluasi Formatif</h2>
-        <button onClick={() => router.push('/mahasiswa/ruang-kerja')} className="text-xs font-bold uppercase tracking-wider text-slate-600 border border-slate-300 rounded px-6 py-2.5 hover:bg-slate-50 transition-colors shadow-sm">
-          Selesai Membaca
+        <button onClick={() => router.push('/mahasiswa/riwayat')} className="text-xs font-bold uppercase tracking-wider text-slate-600 border border-slate-300 rounded px-6 py-2.5 hover:bg-slate-50 transition-colors shadow-sm">
+          Kembali ke Riwayat
         </button>
       </div>
 
@@ -124,12 +119,15 @@ function HasilContent() {
           </div>
           
           <p className="text-slate-400 leading-relaxed text-[13px] mt-4 font-medium max-w-2xl">
-            Draf naskah ini telah melewati tahapan komputasional AI tingkat lanjut dan divalidasi mutlak oleh instruktur. Tinjau bagian <strong className="text-slate-200">Feed-Forward</strong> pada setiap modul untuk instruksi perbaikan konkret.
+            Draf naskah ini telah melewati tahapan komputasional AI tingkat lanjut dan divalidasi mutlak oleh instruktur. Perhatikan warna label untuk membedakan evaluasi murni mesin dan kalibrasi dosen.
           </p>
           
-          <div className="mt-5 flex gap-3">
-            <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded border border-emerald-500/20 flex items-center gap-2">
+          <div className="mt-5 flex flex-wrap gap-3">
+            <span className="text-[9px] font-bold uppercase tracking-widest bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded border border-emerald-500/20 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Telah Divalidasi
+            </span>
+            <span className="text-[9px] font-bold uppercase tracking-widest bg-slate-800 text-slate-300 px-3 py-1.5 rounded border border-slate-700 flex items-center gap-2">
+              Skor Tertimbang Otomatis
             </span>
           </div>
         </div>
@@ -141,7 +139,7 @@ function HasilContent() {
           <div className="bg-amber-50 border border-amber-200 p-6 rounded-xl shadow-sm">
             <h3 className="text-xs font-bold text-amber-800 uppercase tracking-widest mb-3 flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-              Catatan Instruksional (Human-in-the-Loop)
+              Catatan Penutup Dosen Pengampu (Human-in-the-Loop)
             </h3>
             <p className="text-[13px] text-amber-900 leading-relaxed font-medium whitespace-pre-wrap">
               {submission.final_feedback}
@@ -162,27 +160,41 @@ function HasilContent() {
             aiRawArray.map((module: any, index: number) => {
               const init = module.chapterName ? module.chapterName.charAt(0) : `${index+1}`;
               
+              // Logika Diferensiasi Warna Berdasarkan Intervensi Dosen
+              const isEdited = module.isEditedByHuman === true;
+              const headerBgColor = isEdited ? "bg-blue-50 border-blue-200" : "bg-emerald-50 border-emerald-200";
+              const iconBgColor = isEdited ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700";
+              const labelColor = isEdited ? "text-blue-700 border-blue-300 bg-white" : "text-emerald-700 border-emerald-300 bg-white";
+              const labelText = isEdited ? "Disunting Dosen" : "Evaluasi AI Murni";
+              
               return (
                 <div key={index} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md">
-                  <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+                  
+                  {/* Header Kartu dengan Warna Dinamis */}
+                  <div className={`${headerBgColor} border-b px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
                      <div className="flex items-center gap-4">
-                        <div className="w-8 h-8 bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center rounded shadow-sm shrink-0">
+                        <div className={`w-8 h-8 ${iconBgColor} font-bold text-xs flex items-center justify-center rounded shadow-sm shrink-0`}>
                           {init}
                         </div>
                         <h4 className="font-bold text-slate-800 text-sm tracking-tight">{module.chapterName}</h4>
                      </div>
-                     <span className="text-[10px] font-mono font-bold text-slate-600 bg-white border border-slate-300 px-3 py-1.5 rounded shadow-sm">
-                        Skor: {module.score || 0}
-                     </span>
+                     <div className="flex items-center gap-2">
+                       <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded border shadow-sm ${labelColor}`}>
+                         {labelText}
+                       </span>
+                       <span className="text-[10px] font-mono font-bold text-slate-600 bg-white border border-slate-300 px-3 py-1 rounded shadow-sm">
+                         Skor Bab: {module.score || 0}
+                       </span>
+                     </div>
                   </div>
                   
                   <div className="p-6">
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        <div className="bg-emerald-50/50 border border-emerald-100 p-4 rounded-lg">
+                        <div className="bg-emerald-50/30 border border-emerald-100 p-4 rounded-lg">
                            <p className="text-[12px] text-emerald-800 leading-relaxed font-medium"><span className="font-bold uppercase tracking-widest text-[10px] block mb-1">Kekuatan:</span> {module.strengths}</p>
                         </div>
-                        <div className="bg-red-50/50 border border-red-100 p-4 rounded-lg">
-                           <p className="text-[12px] text-red-800 leading-relaxed font-medium"><span className="font-bold uppercase tracking-widest text-[10px] block mb-1">Kelemahan Fatal:</span> {module.improvements}</p>
+                        <div className="bg-red-50/30 border border-red-100 p-4 rounded-lg">
+                           <p className="text-[12px] text-red-800 leading-relaxed font-medium"><span className="font-bold uppercase tracking-widest text-[10px] block mb-1">Kelemahan Utama:</span> {module.improvements}</p>
                         </div>
                      </div>
 
@@ -195,8 +207,9 @@ function HasilContent() {
                         <p className="text-[13px] text-slate-700 leading-relaxed font-medium">{module.pedagogicalAlignment?.feedBack || "N/A"}</p>
                       </div>
                       
-                      <div className="bg-blue-50/30 p-5 rounded-lg border border-blue-100/50">
-                        <h5 className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-3 flex items-center gap-2">
+                      {/* Kotak Tindakan (Berwarna biru redup) */}
+                      <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
+                        <h5 className="text-[10px] font-bold text-slate-700 uppercase tracking-widest mb-3 flex items-center gap-2">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                           Tindakan (Feed-Forward)
                         </h5>
