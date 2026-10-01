@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
+// WAJIB DITAMBAHKAN: Mengizinkan Vercel menunggu hingga 60 detik untuk merespons AI
+export const maxDuration = 60; 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -33,7 +37,7 @@ export async function POST(req: Request) {
       
     const currentIteration = (submissionCount || 0) + 1;
 
-    // 3. Format instruksi rubrik evaluasi untuk OpenAI (MASTER PROMPT FINAL)
+    // 3. Format instruksi rubrik evaluasi untuk OpenAI
     const systemPrompt = `Anda adalah seorang Senior Associate Editor untuk jurnal Q1 Scopus dan Ahli Metodologi Systematic Literature Review (SLR) di bidang Computer Science/Informatics Education.
 
 Tugas Anda adalah menelaah dan memberikan skor pada draf SLR mahasiswa tingkat sarjana yang ditulis dalam format IMRaD. 
@@ -58,12 +62,12 @@ Pelanggaran paling berat (Fatal Flaw) menurut Kitchenham adalah "Annotated Bibli
 ### KNOWLEDGE BASE 3: HATTIE & TIMPERLEY (2007) FORMATIVE FEEDBACK
 Setiap umpan balik yang Anda berikan harus dipecah menjadi 3 dimensi:
 1. Feed-Up (Ekspektasi): Klarifikasi kepada mahasiswa standar keilmuan Q1 apa yang seharusnya dicapai pada bagian tersebut.
-2. Feed-Back (Kondisi Saat Ini): Kritik tajam, analitis, dan blak blakan mengenai letak kecacatan, inkonsistensi, atau kelemahan dari draf mahasiswa saat ini.
+2. Feed-Back (Kondisi Saat Ini): Kritik tajam, analitis, dan blak-blakan mengenai letak kecacatan, inkonsistensi, atau kelemahan dari draf mahasiswa saat ini.
 3. Feed-Forward (Tindakan): Instruksi taktis, spesifik, berupa langkah konkret (poin per poin) yang harus dilakukan mahasiswa pada revisi selanjutnya.
 
 =======================================================
 
-### STANDAR RUBRIK EVALUASI KRITIS (SKOR 0 100):
+### STANDAR RUBRIK EVALUASI KRITIS (SKOR 0-100):
 
 [MODUL 1: INTRODUCTION Berdasarkan PRISMA Item 3 & 4]
 Aturan Penalti: Maksimal Skor 75 jika penulis gagal membuktikan urgensi (Item 3) atau RQ tidak terukur (Item 4).
@@ -75,28 +79,28 @@ Aturan Penalti: Maksimal Skor 65 (FATAL) jika Boolean query dan database tidak d
 Aturan Penalti: Maksimal Skor 65 (FATAL) jika mahasiswa terjebak melakukan "Annotated Bibliography" dan gagal melakukan sintesis tematik lintas studi.
 
 [MODUL 4: DISCUSSION & CONCLUSION Berdasarkan PRISMA Item 23]
-Aturan Penalti: Maksimal Skor 80 jika bab ini sekadar mengulang (copy paste) bab Results, atau gagal mengakui batasan metode (Item 23c).
+Aturan Penalti: Maksimal Skor 80 jika bab ini sekadar mengulang (copy-paste) bab Results, atau gagal mengakui batasan metode (Item 23c).
 
 ### FORMAT OUTPUT WAJIB (JSON MURNI):
 Keluarkan hasil evaluasi Anda HANYA dalam format JSON. TIDAK ADA teks pengantar, penutup, atau blok \`\`\`json. 
 
 {
-  "totalScore": (integer 0 100),
+  "totalScore": 0,
   "evaluations": [
     {
       "chapterName": "1. Introduction",
-      "score": (integer 0 100),
+      "score": 0,
       "strengths": "(1 kalimat) Keunggulan spesifik draf.",
       "improvements": "(1 kalimat) Titik kelemahan paling fatal.",
       "pedagogicalAlignment": {
         "feedUp": "(1 kalimat standar dari PRISMA/Kitchenham yang dituntut)",
-        "feedBack": "(1 2 paragraf kritik tajam membongkar cacat argumen)",
-        "feedForward": "(2 3 poin numerik instruksi perbaikan taktis)"
+        "feedBack": "(1-2 paragraf kritik tajam membongkar cacat argumen)",
+        "feedForward": "(2-3 poin numerik instruksi perbaikan taktis)"
       }
     },
     {
       "chapterName": "2. Methodology",
-      "score": (integer 0 100),
+      "score": 0,
       "strengths": "...",
       "improvements": "...",
       "pedagogicalAlignment": {
@@ -107,7 +111,7 @@ Keluarkan hasil evaluasi Anda HANYA dalam format JSON. TIDAK ADA teks pengantar,
     },
     {
       "chapterName": "3. Results",
-      "score": (integer 0 100),
+      "score": 0,
       "strengths": "...",
       "improvements": "...",
       "pedagogicalAlignment": {
@@ -118,7 +122,7 @@ Keluarkan hasil evaluasi Anda HANYA dalam format JSON. TIDAK ADA teks pengantar,
     },
     {
       "chapterName": "4. Conclusion",
-      "score": (integer 0 100),
+      "score": 0,
       "strengths": "...",
       "improvements": "...",
       "pedagogicalAlignment": {
@@ -131,7 +135,7 @@ Keluarkan hasil evaluasi Anda HANYA dalam format JSON. TIDAK ADA teks pengantar,
 }
 `;
 
-    // 4. Susun Draft Mahasiswa (Variabel yang terlewat)
+    // 4. Susun Draft Mahasiswa
     const userDraft = `
 Silakan evaluasi draf naskah berikut:
 
@@ -147,6 +151,12 @@ ${resultText}
 [4. DISCUSSION]:
 ${discussText}
 `;
+
+    // Pastikan API key terdeteksi oleh sistem Vercel
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("CRITICAL ERROR: OPENAI_API_KEY tidak ditemukan di environment variables Vercel.");
+      return NextResponse.json({ error: "Sistem belum dikonfigurasi sepenuhnya (API Key hilang)." }, { status: 500 });
+    }
 
     // 5. Panggil API OpenAI
     const openAiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -168,8 +178,8 @@ ${discussText}
 
     if (!openAiRes.ok) {
       const errDetail = await openAiRes.text();
-      console.error("OpenAI Error:", errDetail);
-      return NextResponse.json({ error: "Gagal memproses inferensi AI." }, { status: 500 });
+      console.error("OpenAI Error:", errDetail); // Anda dapat melihat log ini di Vercel Dashboard
+      return NextResponse.json({ error: "Gagal memproses inferensi AI (Koneksi Ditolak oleh LLM)." }, { status: 500 });
     }
 
     const openAiData = await openAiRes.json();
@@ -181,8 +191,7 @@ ${discussText}
       return NextResponse.json({ error: "Format luaran AI tidak valid (JSON Parse Error)." }, { status: 500 });
     }
 
-    // 6. Komputasi Total Skor Secara Matematis (Server side Override)
-    // Jangan biarkan AI menghitung skor total. Sistem yang menghitung rata rata dari skor modul.
+    // 6. Komputasi Total Skor Secara Matematis
     let computedTotalScore = 0;
     
     if (evaluationResult.evaluations && Array.isArray(evaluationResult.evaluations)) {
@@ -206,7 +215,7 @@ ${discussText}
         result_text: resultText,
         discuss_text: discussText,
         ai_raw_feedback: evaluationResult, 
-        ai_total_score: computedTotalScore, // Menggunakan skor hasil komputasi presisi
+        ai_total_score: computedTotalScore,
       })
       .select()
       .single();
